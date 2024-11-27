@@ -25,4 +25,7 @@ The primary purpose of this SQL code is to structure and populate a database for
 - **Security:** Sensitive information, such as the culprit's identity, should be protected to prevent data leaks.
 - **User-Friendly Query Structure:** Queries should be optimized for readability and efficiency.
 
-### 4. Normalization up to 3NF:
+### 4. Normalization up to 3NF
+### 5. ER diagram
+![image](https://github.com/user-attachments/assets/3ff13f34-a570-4ff6-9ac4-a96caa4e618b)
+
