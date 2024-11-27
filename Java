@@ -1,0 +1,719 @@
+package dbms;
+
+
+
+import javax.swing.*;
+
+import java.awt.*;
+
+import java.awt.event.*;
+
+import java.sql.*;
+
+
+
+public class Main {
+
+    private static final String DB_URL = "jdbc:mysql://127.0.0.1:3306/CIG?useSSL=false&allowPublicKeyRetrieval=true";
+
+    private static final String USER = "root";
+
+    private static final String PASS = "root";
+
+    static int caseId = 1, puzzleId = 1, UId, solvedPuzzles = 0;
+
+    static String username, correctCulprit;
+
+    static JFrame frame;
+
+    static JPanel panel;
+
+    static JTextArea gameTextArea;
+
+    static JTextField usernameField, passwordField;
+
+    static JButton loginButton, registerButton, hintButton, nextPuzzleButton, guessCulpritButton;
+
+    static JButton leaderboardButton;
+
+    static Connection conn;
+
+
+
+    public static void main(String[] args) {
+        // Setup GUI window
+        frame = new JFrame("Crime Investigation Game");
+        frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        frame.setSize(800, 600);
+        frame.setLayout(new CardLayout());
+
+        // Initialize the Login Panel
+        panel = new JPanel();
+        panel.setLayout(new BorderLayout());
+
+        // Title Label
+        JLabel titleLabel = new JLabel("Welcome to Crime Investigation Game!", JLabel.CENTER);
+        titleLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        titleLabel.setForeground(new Color(50, 50, 200)); // Dark Blue color for the title
+        panel.add(titleLabel, BorderLayout.NORTH);
+
+        // Create the username and password fields
+        JPanel loginPanel = new JPanel();
+        loginPanel.setLayout(new GridBagLayout());
+        loginPanel.setBackground(new Color(245, 245, 245)); // Light gray background for the login panel
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10); // Padding between fields and components
+
+        // Username label and field
+        JLabel userLabel = new JLabel("Username: ");
+        userLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        loginPanel.add(userLabel, gbc);
+
+        usernameField = new JTextField(20);
+        usernameField.setFont(new Font("Arial", Font.PLAIN, 16));
+        usernameField.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200), 2));
+        gbc.gridx = 1;
+        gbc.gridy = 0;
+        loginPanel.add(usernameField, gbc);
+
+        // Password label and field
+        JLabel passLabel = new JLabel("Password: ");
+        passLabel.setFont(new Font("Arial", Font.PLAIN, 16));
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        loginPanel.add(passLabel, gbc);
+
+        passwordField = new JPasswordField(20);
+        passwordField.setFont(new Font("Arial", Font.PLAIN, 16));
+        passwordField.setBorder(BorderFactory.createLineBorder(new Color(200, 200, 200), 2));
+        gbc.gridx = 1;
+        gbc.gridy = 1;
+        loginPanel.add(passwordField, gbc);
+
+        // Add Login and Register buttons with custom styling
+        loginButton = new JButton("Login");
+        loginButton.setFont(new Font("Arial", Font.PLAIN, 16));
+        loginButton.setBackground(new Color(70, 130, 180)); // Steel Blue
+        loginButton.setForeground(Color.WHITE);
+        loginButton.setFocusPainted(false);
+        loginButton.setPreferredSize(new Dimension(180, 50));  // Increase button height
+        loginButton.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding inside button
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        loginPanel.add(loginButton, gbc);
+
+        registerButton = new JButton("Register");
+        registerButton.setFont(new Font("Arial", Font.PLAIN, 16));
+        registerButton.setBackground(new Color(34, 139, 34)); // Forest Green
+        registerButton.setForeground(Color.WHITE);
+        registerButton.setFocusPainted(false);
+        registerButton.setPreferredSize(new Dimension(180, 50));  // Increase button height
+        registerButton.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Padding inside button
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        loginPanel.add(registerButton, gbc);
+
+        // Add login panel to the main panel
+        panel.add(loginPanel, BorderLayout.CENTER);
+
+        // Add panel to the frame
+        frame.add(panel);
+        frame.setVisible(true);
+
+        // Action listeners for buttons
+        loginButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String username = usernameField.getText();
+                String password = passwordField.getText();
+                if (authenticateUser(username, password)) {
+                    JOptionPane.showMessageDialog(frame, "Login successful!");
+                    startGame();
+                } else {
+                    JOptionPane.showMessageDialog(frame, "Invalid login credentials.");
+                }
+            }
+        });
+
+        registerButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                String username = usernameField.getText();
+                String password = passwordField.getText();
+                if (checkUserExists(username)) {
+                    JOptionPane.showMessageDialog(frame, "Username already exists.");
+                } else {
+                    addUser(username, password);
+                    JOptionPane.showMessageDialog(frame, "User registered successfully.");
+                }
+            }
+        });
+    }
+
+
+
+    // Authenticate user with the database
+
+    private static boolean authenticateUser(String username, String password) {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "SELECT * FROM user WHERE username = ? AND password = ?";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setString(1, username);
+
+            preparedStatement.setString(2, password);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            if (resultSet.next()) {
+
+                UId = resultSet.getInt("user_id");
+
+                Main.username = username;
+
+                return true;
+
+            }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+        return false;
+
+    }
+
+
+
+    private static void startGame() {
+        // Switch to the game screen
+        panel.removeAll();
+        panel.setLayout(new BorderLayout());
+
+        // Set background color of the panel to light gray for a modern look
+        panel.setBackground(new Color(245, 245, 245));
+
+        // Create a game text area for displaying game information
+        gameTextArea = new JTextArea();
+        gameTextArea.setEditable(false);
+        gameTextArea.setFont(new Font("Arial", Font.PLAIN, 16)); // Set font and size for better readability
+        gameTextArea.setBackground(new Color(255, 255, 255));  // White background for text area
+        gameTextArea.setForeground(new Color(0, 0, 0)); // Black text for readability
+        gameTextArea.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10)); // Add padding around the text area
+        panel.add(new JScrollPane(gameTextArea), BorderLayout.CENTER);
+
+        // Add a title or header for the game panel to make it stand out
+        JLabel gameTitle = new JLabel("Crime Investigation Game", JLabel.CENTER);
+        gameTitle.setFont(new Font("Arial", Font.BOLD, 20));
+        gameTitle.setForeground(new Color(50, 50, 200)); // Dark blue color for the title
+        panel.add(gameTitle, BorderLayout.NORTH);
+
+        // Add buttons for next puzzle and guessing the culprit
+        JPanel actionPanel = new JPanel();
+        actionPanel.setLayout(new GridLayout(1, 4, 10, 10)); // Use GridLayout for better alignment
+        actionPanel.setBackground(new Color(245, 245, 245)); // Same background color for consistency
+
+        // Hint button with a larger font and custom styling
+        hintButton = new JButton("Show Hint");
+        hintButton.setFont(new Font("Arial", Font.PLAIN, 14));
+        hintButton.setBackground(new Color(70, 130, 180)); // Steel blue background
+        hintButton.setForeground(Color.WHITE);
+        hintButton.setFocusPainted(false);
+        hintButton.setPreferredSize(new Dimension(150, 50)); // Increase height of button
+        actionPanel.add(hintButton);
+
+        // Next puzzle button with icon
+        nextPuzzleButton = new JButton("Give Answer");
+        nextPuzzleButton.setFont(new Font("Arial", Font.PLAIN, 14));
+        nextPuzzleButton.setBackground(new Color(34, 139, 34)); // Forest green for correct answers
+        nextPuzzleButton.setForeground(Color.WHITE);
+        nextPuzzleButton.setFocusPainted(false);
+        nextPuzzleButton.setPreferredSize(new Dimension(150, 50)); // Increase height of button
+        actionPanel.add(nextPuzzleButton);
+
+        // Guess culprit button with a disabled state initially
+        guessCulpritButton = new JButton("Guess Culprit");
+        guessCulpritButton.setFont(new Font("Arial", Font.PLAIN, 14));
+        guessCulpritButton.setBackground(new Color(255, 69, 0)); // Red-orange for the guess button
+        guessCulpritButton.setForeground(Color.WHITE);
+        guessCulpritButton.setEnabled(true); // Initially disabled
+        guessCulpritButton.setFocusPainted(false);
+        guessCulpritButton.setPreferredSize(new Dimension(150, 50)); // Increase height of button
+        actionPanel.add(guessCulpritButton);
+
+        // Leaderboard button with custom styling
+        leaderboardButton = new JButton("Leaderboard");
+        leaderboardButton.setFont(new Font("Arial", Font.PLAIN, 14));
+        leaderboardButton.setBackground(new Color(30, 144, 255)); // Dodger blue color
+        leaderboardButton.setForeground(Color.WHITE);
+        leaderboardButton.setFocusPainted(false);
+        leaderboardButton.setPreferredSize(new Dimension(150, 50)); // Increase height of button
+        actionPanel.add(leaderboardButton);
+
+        // Add action panel at the bottom of the screen
+        panel.add(actionPanel, BorderLayout.SOUTH);
+
+        // Update game text area with case and puzzle info
+        displayCaseOverview();
+
+        // Action listeners for buttons
+        hintButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                displayHint();
+            }
+        });
+
+        nextPuzzleButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                checkPuzzleAnswer();
+            }
+        });
+
+        guessCulpritButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                guessCulprit();
+            }
+        });
+
+        leaderboardButton.addActionListener(new ActionListener() {
+            public void actionPerformed(ActionEvent e) {
+                showLeaderboard();
+            }
+        });
+
+        // Switch the panel to game interface and refresh the frame
+        frame.revalidate();
+        frame.repaint();
+    }
+
+
+
+
+    private static void displayCaseOverview() {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            // Fetch the case title and overview for the current case
+
+            String sql = "SELECT title, overview FROM `case` WHERE case_id = ?";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setInt(1, caseId);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+
+
+            if (resultSet.next()) {
+
+                String caseTitle = resultSet.getString("title");
+
+                String caseOverview = resultSet.getString("overview");
+
+
+
+                // Display the case title and overview
+
+                gameTextArea.setText("Case Title: " + caseTitle + "\n\n");
+
+                gameTextArea.append("Case Overview: " + caseOverview + "\n\n");
+
+            } else {
+
+                gameTextArea.setText("No details found for this case.");
+
+            }
+
+
+
+            // Fetch and display suspects for the current case
+
+            StringBuilder suspectsInfo = new StringBuilder("\nSuspects:\n\n");
+
+            sql = "SELECT name, description FROM suspect WHERE case_id = ?";
+
+            preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setInt(1, caseId);
+
+            resultSet = preparedStatement.executeQuery();
+
+
+
+            while (resultSet.next()) {
+
+                suspectsInfo.append("Name: ").append(resultSet.getString("name"))
+
+                             .append("\nDescription: ").append(resultSet.getString("description"))
+
+                             .append("\n\n");
+
+            }
+
+
+
+            gameTextArea.append(suspectsInfo.toString());
+
+
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+
+
+        // Now fetch and display the first puzzle for the case
+
+        fetchPuzzle();
+
+    }
+
+
+
+
+
+    private static void fetchPuzzle() {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            // We need to fetch puzzles based on the current puzzleId and caseId
+
+            String sql = "SELECT puzzle_id, clue FROM puzzle WHERE case_id = ? AND puzzle_id = ?";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setInt(1, caseId);
+
+            preparedStatement.setInt(2, puzzleId);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+
+
+            if (resultSet.next()) {
+
+                String puzzleClue = resultSet.getString("clue");
+
+                gameTextArea.append("\n\nPuzzle " + puzzleId + ":\n" + puzzleClue);
+
+                fetchPuzzleOptions();
+
+            } else {
+
+                // If no puzzle is found, check if there are more cases or puzzles left
+
+                gameTextArea.append("\n\nNo puzzles available for this case.");
+
+            }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+
+
+
+
+
+
+    private static void fetchPuzzleOptions() {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "SELECT option_text FROM puzzle_options WHERE puzzle_id = ?";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setInt(1, puzzleId);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+
+
+            StringBuilder options = new StringBuilder("\nOptions:\n");
+
+            while (resultSet.next()) {
+
+                options.append(resultSet.getString("option_text")).append("\n");
+
+            }
+
+            gameTextArea.append(options.toString());
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+
+
+    private static void displayHint() {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "SELECT hint_text FROM hint WHERE puzzle_id = ?";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setInt(1, puzzleId);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+
+
+            if (resultSet.next()) {
+
+                String hint = resultSet.getString("hint_text");
+
+                JOptionPane.showMessageDialog(frame, "Hint: " + hint);
+
+            }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+
+
+    private static void checkPuzzleAnswer() {
+
+        String userAnswer = JOptionPane.showInputDialog(frame, "Enter your answer:");
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "SELECT answer FROM puzzle WHERE puzzle_id = ? AND case_id = ?";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setInt(1, puzzleId);
+
+            preparedStatement.setInt(2, caseId);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+
+
+            if (resultSet.next()) {
+
+                String correctAnswer = resultSet.getString("answer");
+
+                if (userAnswer.equalsIgnoreCase(correctAnswer)) {
+
+                    solvedPuzzles++;
+
+                    JOptionPane.showMessageDialog(frame, "Correct answer!");
+
+
+
+                    // After solving all puzzles for this case
+
+                    if (solvedPuzzles == 5) {  // Assuming 5 puzzles per case
+
+                        guessCulpritButton.setEnabled(true);  // Enable the Guess Culprit button
+
+                        JOptionPane.showMessageDialog(frame, "All puzzles solved. Now guess the culprit!");
+
+                    } else {
+
+                        puzzleId++;  // Continue to the next puzzle
+
+                        fetchPuzzle();  // Fetch next puzzle
+
+                    }
+
+                } else {
+
+                    JOptionPane.showMessageDialog(frame, "Incorrect answer, try again.");
+
+                }
+
+            }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+
+
+
+
+
+
+    private static void guessCulprit() {
+
+        String userGuess = JOptionPane.showInputDialog(frame, "Who do you think is the culprit?");
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "SELECT name FROM suspect WHERE case_id = ? AND culprit = 1";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setInt(1, caseId);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+
+
+            if (resultSet.next()) {
+
+                correctCulprit = resultSet.getString("name");
+
+            }
+
+
+
+            if (userGuess.equalsIgnoreCase(correctCulprit)) {
+
+                JOptionPane.showMessageDialog(frame, "Congratulations! You guessed the culprit correctly.");
+
+                caseId++;  // Move to the next case
+
+                puzzleId = (caseId - 1) * 5 + 1;  // Reset puzzleId to the first puzzle of the new case
+
+                solvedPuzzles = 0;  // Reset the number of solved puzzles
+
+                guessCulpritButton.setEnabled(true);  // Disable Guess Culprit button
+
+
+
+                // Fetch and display the next set of puzzles
+
+                displayCaseOverview();  // Show the next case's overview and puzzles
+
+            } else {
+
+                JOptionPane.showMessageDialog(frame, "Incorrect guess. Try again.");
+
+            }
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+
+
+
+
+    private static void showLeaderboard() {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "SELECT u.username, l.total_points, l.date FROM leaderboard l JOIN user u ON l.user_id = u.user_id ORDER BY l.total_points DESC";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+
+
+            StringBuilder leaderboard = new StringBuilder("Leaderboard:\n\n");
+
+            while (resultSet.next()) {
+
+                leaderboard.append(resultSet.getString("username"))
+
+                        .append(": ")
+
+                        .append(resultSet.getInt("total_points"))
+
+                        .append(" points (")
+
+                        .append(resultSet.getTimestamp("date"))
+
+                        .append(")\n");
+
+            }
+
+
+
+            JOptionPane.showMessageDialog(frame, leaderboard.toString());
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+
+
+    private static boolean checkUserExists(String username) {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "SELECT * FROM user WHERE username = ?";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setString(1, username);
+
+            ResultSet resultSet = preparedStatement.executeQuery();
+
+            return resultSet.next();
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+        return false;
+
+    }
+
+
+
+    private static void addUser(String username, String password) {
+
+        try (Connection conn = DriverManager.getConnection(DB_URL, USER, PASS)) {
+
+            String sql = "INSERT INTO user (username, password) VALUES (?, ?)";
+
+            PreparedStatement preparedStatement = conn.prepareStatement(sql);
+
+            preparedStatement.setString(1, username);
+
+            preparedStatement.setString(2, password);
+
+            preparedStatement.executeUpdate();
+
+        } catch (SQLException e) {
+
+            e.printStackTrace();
+
+        }
+
+    }
+
+}
